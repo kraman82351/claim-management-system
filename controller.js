@@ -110,7 +110,7 @@ let allUsers = [{
 
 let allClaims = [{
     claimId: '4ca4853d-cfc0-4487-a264-8ad1d76ed8c8',
-    insuranceId: 'vbljanvljknv',
+    insuranceId: '21802de5-b1f4-4760-9e22-6b07abc66c56',
     claimedAmount: 35000,
     reason: 'accident',
     requestDate: '12/12/12',
@@ -118,7 +118,7 @@ let allClaims = [{
   },
   {
     claimId: 'f84f4dc9-5966-472e-bdf1-5ac64b17d244',
-    insuranceId: 'cabjkbapicajb',
+    insuranceId: '21802de5-b1f4-4760-9e22-6b07abc66c56',
     claimedAmount: 55000,
     reason: 'cancer',
     requestDate: '10/11/24',
@@ -126,7 +126,7 @@ let allClaims = [{
   },
   {
     claimId: '381e5614-4fcf-4598-86d5-b7d2a5a0e5ed',
-    insuranceId: 'cabbbsjjjsn',
+    insuranceId: '0ec2dd62-6e08-4e31-873b-c200bbb6f69c',
     claimedAmount: 155000,
     reason: 'cancer',
     requestDate: '23/08/21',
@@ -157,16 +157,39 @@ app.get("/admin", function(req, res){
 
 //get all the users details
 app.get("/admin/get_users", function(req, res) {
-    
-    res.json(allUsers);
+
+    const userId = req.query.userId;
+
+    if(userId){        
+        const user = allUsers.find( user => user.userId == userId);
+        if(user){
+            res.json(user);
+        }else{
+            res.status(404).json("User not found");
+        }
+
+    }else{
+        res.json(allUsers);
+    }
 
 });
 
 
 //get all the claims details
 app.get("/admin/get_claims", function(req, res) {
-    
-    res.json(allClaims);
+
+    const claimId = req.query.claimId;
+
+    if(claimId){
+        const claim = allClaims.find(claim => claim.claimId == claimId);
+        if(claim){
+            res.json(claim);
+        }else{
+            res.status(404).json("claim not found");
+        }
+    }else{
+        res.json(allClaims);
+    }
 
 });
 
@@ -174,7 +197,18 @@ app.get("/admin/get_claims", function(req, res) {
 //get all the insurance policies details
 app.get("/admin/get_policies", function(req, res) {
 
-    res.json(allPolicies);
+    const insuranceId = req.query.insuranceId;
+
+    if(insuranceId){
+        const insurance = allPolicies.find( policy => policy.insuranceId == insuranceId);
+        if(insurance){
+            res.json(insurance);
+        }else{
+            res.status(404).json("policy not found");
+        }
+    }else{
+        res.json(allPolicies);
+    }
 
 });
 
@@ -195,27 +229,20 @@ app.get("/admin/pending_claims", function(req, res) {
 app.post("/admin/pending_claims", function(req, res) {
     const claimId = req.body.claimId;
     const status = req.body.status;
-    var flag = 1;
-    allClaims.forEach(claim => {
-        if(claimId == claim.claimId){
-            flag = 0;
-            claim.status = status;
-            if(claim.status == "Approved"){
-                allPolicies.forEach(policy => {
-                    if(policy.insuranceId == claim.insuranceId){
-                        policy.residualAmount = policy.residualAmount - claim.claimedAmount;
-                        return;
-                    }
-                });
-                res.json("Claim approved");
-                return;
-            }
+
+    const claim = allClaims.find(claim => claim.claimId == claimId);
+
+    if(claim){
+        claim.status = status;
+        if(claim.status == "Approved"){
+            const policy = allPolicies.find(policy => policy.insuranceId == claim.insuranceId);
+            policy.residualAmount = policy.residualAmount - claim.claimedAmount;
+            res.json("Claim approved");
+        }else{
             res.json(`claimed insurance status is marked as ${status}`);
         }
-        return;
-    });
 
-    if(flag){
+    }else{
         res.json("Wrong claimID");
     }
 

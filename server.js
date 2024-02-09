@@ -1,10 +1,14 @@
 //jshint esversion:6
-
+require("dotenv").config();
+const mongoose = require('mongoose');
 const express = require("express");
 const bodyParser = require("body-parser");
+const connect = require('./database/conn.js');
+
 const { v4: uuidv4 } = require('uuid'); // for unique ID generation
 
 const app = express();
+connect();
 app.use(express.json());
 
 app.use(bodyParser.urlencoded({extended: true}));
@@ -249,6 +253,25 @@ app.post("/admin/pending_claims", function(req, res) {
 });
 
 
+//delete a particular user
+app.post("/admin/delete_user", function(req, res){
+
+    const userId = req.body.userId;
+
+    if(userId){
+        const index = allUsers.findIndex(user => user.userId == userId);
+        if(index !== -1){
+            allUsers.splice(index, 1);
+            res.json("user successfully deleted");
+
+        }else{
+            res.status(404).json("User not found");
+        }
+    }else{
+        res.json("User ID is required");
+    }   
+
+});
 
 //register user 
 app.post("/register", generateUniqueId, (req, res) =>{
@@ -352,6 +375,16 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
 });
 
 
-app.listen(3000, function() {
-  console.log("Server started on port 3000");
-});
+const port = 3000;
+connect().then(() => {
+    try {
+        app.listen(port, () => {
+            console.log(`Server connected to http://localhost:${port}`)
+        })
+    } catch (error) {
+        console.log("Cannot connect to the server");
+    }
+}).catch(error => {
+    console.log("Invalid Database Connection");
+})
+ 

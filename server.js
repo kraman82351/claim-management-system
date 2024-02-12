@@ -156,38 +156,28 @@ app.post("/admin/pending_claims", function(req, res) {
         .then(claim => {
             if (!claim) {
                 return res.status(404).json({ error: "Claim not found" });
-            }
-
-            // Update the status of the claim
-            claim.status = status;
-            return claim.save();
+            }else{
+                claim.status = status;
+                claim.save();   
+                if (status === "Approved") {
+                    // Find the associated policy
+                    return policies.findOne({ insuranceId: claim.insuranceId })
+                        .then(policy => {
+                            if (!policy) {
+                                return res.status(404).json({ error: "Policy not found" });
+                            }else{
+                                policy.residualAmount -= claim.claimedAmount;
+                                policy.save();
+                                return res.json("Claim approved");
+                            }
+    
+                        });
+                } else {
+                    return res.json(`Claim status updated to ${status}`);
+                }
+            }          
+            
         })
-        .then(claim => {
-            if (status === "Approved") {
-                // Find the associated policy
-                return policies.findOne({ insuranceId: claim.insuranceId })
-                    .then(policy => {
-                        if (!policy) {
-                            return res.status(404).json({ error: "Policy not found" });
-                        }
-
-                        // Update the residual amount of the policy
-                        policy.residualAmount -= claim.claimedAmount;
-                        return policy.save();
-                    });
-            } else {
-                return res.json(`Claim status updated to ${status}`);
-            }
-        })
-        .then(() => {
-            if (status === "Approved") {
-                return res.json("Claim approved");
-            }
-        })
-        .catch(error => {
-            console.error("Error updating claim status:", error);
-            return res.status(500).json({ error: "Internal server error" });
-        });
 
 });
 

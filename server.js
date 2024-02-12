@@ -61,12 +61,10 @@ app.get("/admin/get_users", function(req, res) {
         .then(user => {
             res.json(user);
             // Close the connection
-            mongoose.connection.close();
         })
         .catch(error => {
             res.json(error);
             // Close the connection
-            mongoose.connection.close();
         });
     }
 
@@ -91,12 +89,10 @@ app.get("/admin/get_claims", function(req, res) {
         .then(claim => {
             res.json(claim);
             // Close the connection
-            mongoose.connection.close();
         })
         .catch(error => {
             res.json(error);
             // Close the connection
-            mongoose.connection.close();
         });
     }
 
@@ -121,12 +117,10 @@ app.get("/admin/get_policies", function(req, res) {
         .then(policy => {
             res.json(policy);
             // Close the connection
-            mongoose.connection.close();
         })
         .catch(error => {
             res.json(error);
             // Close the connection
-            mongoose.connection.close();
         });
     }
 
@@ -141,15 +135,21 @@ app.get("/admin/pending_claims", function(req, res) {
         })
         .catch(error => {
             console.error("Error retrieving pending claims:", error);
-            res.status(500).json({ error: "Internal server error" });
+            res.status(500).json({ error: "Error retrieving pending claims" });
         });
 
 });
 
 //Admin updating the status of specific claim
 app.post("/admin/pending_claims", function(req, res) {
-    const claimId = req.body.claimId;
-    const status = req.body.status;
+    const {claimId, status} = req.body;
+
+    if(!claimId || !status){
+        return res.status(400).json({
+            statusCode: 400,
+            message : "All fields are mandatory" 
+        });
+    }
 
     // Find the claim by claimId
     claims.findOne({ claimId })
@@ -184,16 +184,37 @@ app.post("/admin/pending_claims", function(req, res) {
 //add new policy type
 app.post("/admin/add_policy", function(req, res){
     const {policyNumber, policyType, coverageAmount, premium} = req.body;
-    const availablePoliciesData = new availablePolicies({
-        policyNumber: policyNumber,
-        policyType: policyType,
-        coverageAmount: coverageAmount,
-        premium: premium
-    });
-    
-    availablePoliciesData.save()
-        .then(result => res.status(201).send({ msg: "Policy added Successfully"}))
-        .catch(error => res.status(500).send({error}))
+    if(!policyNumber || !policyType || !coverageAmount || !premium){
+        return res.status(400).json({
+            statusCode: 400,
+            message : "All fields are mandatory" 
+        });
+    }
+
+    availablePolicies.findOne({policyNumber})
+        .then( policy =>{
+            if(policy){
+                return res.status(409).json({
+                    statusCode: 409,
+                    message : "Policy Number is already in use" 
+                })
+            }
+
+            const availablePoliciesData = new availablePolicies({
+                policyNumber: policyNumber,
+                policyType: policyType,
+                coverageAmount: coverageAmount,
+                premium: premium
+            });
+            
+            availablePoliciesData.save()
+                .then(result => res.status(201).send({ msg: "Policy added Successfully"}))
+                .catch(error => res.status(500).json({
+                        statusCode: 500,
+                        message: "Addition of policy failed. Try again later"
+                    }))
+
+        })
 });
 
 
@@ -211,29 +232,51 @@ app.delete("/admin/delete_user", function(req, res){
         })
         .catch(error => {
             console.error("Error deleting user:", error);
-            res.status(500).json({ error: "Internal server error" });
+            res.status(500).json({
+                statusCode: 500,
+                message: "Deletion failed. Try again later"
+            });
         });
 
 });
 
 //register user 
 app.post("/register", generateUniqueId, (req, res) =>{
-    const userData = new users({
-      userId: req.uniqueId,
-      fullName: req.body.name,
-      address: req.body.address,
-      emailId: req.body.emailId,
-      password: req.body.password,
-      policies: [],
-      claims: []
-    });
-  
-    userData.save()
-        .then(result => res.status(201).json("User Register Successfully"))
-        .catch(error => res.status(500).json(error))
+    const { fullName, address, emailId, password} = req.body;
 
+    if( !fullName || !address || !emailId || !password){
+        return res.status(400).json({
+            statusCode: 400,
+            message : "All fields are mandatory" 
+        });
+    }
 
-    //res.json("user has sucessfully registered");
+    users.findOne({emailId })
+        .then( user =>{
+            if(user){
+                return res.status(409).json({
+                    statusCode: 409,
+                    message : "Email already in use" 
+                })
+            }
+            userData = new users({
+                userId: req.uniqueId,
+                fullName: fullName,
+                address: address,
+                emailId: emailId,
+                password: password,
+                policies: [],
+                claims: []
+                });
+            
+                userData.save()
+                    .then(result => res.status(201).json("User Register Successfully"))
+                    .catch(error => res.status(500).json({
+                        statusCode: 500,
+                        message: "Registration failed. Try again later"
+                    }))
+
+        });
   
 });
 
@@ -245,12 +288,10 @@ app.get("/home/add_insurance", function(req, res){
         .then(availablePolicies => {
             res.json(availablePolicies);
             // Close the connection
-            mongoose.connection.close();
         })
         .catch(error => {
             res.json(error);
             // Close the connection
-            mongoose.connection.close();
         });
     
     //res.json(availablePolicies);
@@ -263,10 +304,19 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
     const policyNumber = req.body.policyNumber;
     const userId = req.body.userId;    
 
+    if(!policyNumber || !userId){
+        return res.status(400).json({
+            statusCode: 400,
+            message : "All fields are mandatory" 
+        });
+    }
+
     availablePolicies.findOne({ policyNumber })
     .then(policy => {
         if (!policy) {
-            return res.status(404).json({ error: "Couldn't Find the Policy" });
+            return res.status(404).json({ 
+                statusCode: 404,
+                error: "Couldn't Find the Policy" });
         }
 
         const start = new Date().toISOString().slice(0, 10);
@@ -286,7 +336,10 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
 
         insurancePolicy.save()
             .then(result => res.status(201).json("Policy added successfully"))
-            .catch(error => res.status(500).json(error));
+            .catch(error => res.status(500).json({
+                statusCode: 500,
+                message: "Policy addition failed."
+            }));
     })
     .catch(error => res.status(500).json("wrong policy number"));
 
@@ -295,7 +348,16 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
 
 //post request made when the user click on claim request button
 app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
-    const insuranceId = req.body.insuranceId;
+
+    const {insuranceId, claimedAmount, reason} = req.body;
+
+    if(!insuranceId || !claimedAmount || !reason){
+        return res.status(400).json({
+            statusCode: 400,
+            message : "All fields are mandatory" 
+        });
+    }
+
     policies.findOne({insuranceId})
     .then(policyData => {
 
@@ -303,21 +365,27 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
 
             const claimData = new claims({
                 claimId: req.uniqueId,
-                insuranceId: req.body.insuranceId,
-                claimedAmount: req.body.claimedAmount,
-                reason: req.body.reason,
+                insuranceId: insuranceId,
+                claimedAmount: claimedAmount,
+                reason: reason,
                 requestDate: (new Date()).toISOString().slice(0, 10),
                 status: "Pending"
             });
             
             claimData.save()
-                .then(result => res.status(201).json("Policy added successfully"))
-                .catch(error => res.status(500).json(error));
+                .then(result => res.status(201).json("Claim request sent successfully"))
+                .catch(error => res.status(500).json({
+                    statusCode: 500,
+                    error: "Claim request failed due to server error."
+                }));
 
             //res.json(claimData);
     
         }else{
-            res.json("claimed Amount is more than the residual coverage amount");
+            res.json({
+                statusCode: 400,
+                message: "claimed Amount is more than the residual coverage amount"
+            });
         }  
 
     })

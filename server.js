@@ -240,6 +240,39 @@ app.delete("/admin/delete_user", function(req, res){
 
 });
 
+//password verification
+function passwordValidate(errors = {}, password){
+    /* eslint-disable no-useless-escape */
+    const specialChars = /[`!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/;
+    errors = { message: "ok"};
+
+    if(!password){
+        errors.message = "Password Required...!";
+    } else if(password.includes(" ")){
+        errors.message = "Password must not contain spaces";
+    }else if(password.length < 4){
+        errors.message = "Password must be more than 4 characters long";
+    }else if(!specialChars.test(password)){
+        errors.message = "Password must have special character";
+    }
+    return errors;
+}
+
+//email validation
+function emailValidate(error ={}, email){
+    error.message = "ok";
+
+    if(!email){
+        error.message = "Email Required...!";
+    }else if(email.includes(" ")){
+        error.message = "Email should not include spaces";
+    }else if(!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(email)){
+        error.message = "Invalid email address...!";
+    }
+
+    return error;
+}
+
 //register user 
 app.post("/register", generateUniqueId, (req, res) =>{
     const { fullName, address, emailId, password} = req.body;
@@ -251,6 +284,17 @@ app.post("/register", generateUniqueId, (req, res) =>{
         });
     }
 
+    //email validation
+    const emailError = emailValidate({}, emailId);
+    if(emailError.message != "ok"){
+        return res.status(400).send({Error: emailError.message});
+    }
+
+    //password validation
+    const passwordError = passwordValidate({}, password);
+    if(passwordError.message != "ok"){
+        return res.status(400).send({Error: passwordError.message});
+    }
     users.findOne({emailId })
         .then( user =>{
             if(user){

@@ -314,7 +314,9 @@ app.post("/register", generateUniqueId, (req, res) =>{
                 });
             
                 userData.save()
-                    .then(result => res.status(201).json("User Register Successfully"))
+                    .then(result => res.status(201).json({
+                        response : userData,
+                        resonsemessage:"User Register Successfully"}))
                     .catch(error => res.status(500).json({
                         statusCode: 500,
                         message: "Registration failed. Try again later"
@@ -323,6 +325,61 @@ app.post("/register", generateUniqueId, (req, res) =>{
         });
   
 });
+
+//user login
+app.post("/userlogin", function(req, res){
+    const {emailId, password} = req.body;
+
+    if(!emailId || !password){
+        return res.status(400).json({
+            statusCode: 400,
+            message : "All fields are mandatory" 
+        });
+    }
+
+    users.findOne({emailId})
+        .then(user => {
+            if(!user){
+                return res.status(404).json({ 
+                    statusCode: 404,
+                    error: "Couldn't Find the user" });
+            }
+
+            if(user.password != password){
+                return res.status(400).json({ 
+                    statusCode: 400,
+                    error: "Wrong Password" });
+            }
+            return res.json({message : "user logged In"});
+        })
+        .catch(error => res.status(500).json("Server Error"));
+})
+
+//admin login
+app.post("/adminlogin", function(req, res){
+    const { emailId, password } = req.body;
+
+    if (!emailId || !password) {
+        return res.status(400).json({
+            statusCode: 400,
+            message: "All fields are mandatory" 
+        });
+    }
+
+    const adminData = data.adminData.find(admin => admin.emailId === emailId && admin.password === password);
+
+    if (adminData) {
+        // If credentials match, send a JSON response with a success message
+        res.json({ message: "Admin logged In" });
+    } else {
+        // If credentials don't match, send a JSON response with an error message
+        res.status(400).json({
+            statusCode: 400,
+            message: "Wrong credentials" 
+        });
+    }
+    
+})
 
 
 //show all the available insurance policies

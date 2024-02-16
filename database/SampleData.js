@@ -123,9 +123,17 @@ let allClaims = [{
   }
 ];
 
+const adminData = [{
+  emailId: "admin123@gmail.com",
+  password: "admin@123"
+}];
+
 module.exports = {
     allUsers: allUsers,
     availablePolicies: availablePolicies,
     allClaims: allClaims,
-    allPolicies: allPolicies
+    allPolicies: allPolicies,
+    adminData: adminData
+
 };
+

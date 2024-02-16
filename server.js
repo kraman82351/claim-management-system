@@ -52,6 +52,25 @@ app.get("/admin", function(req, res){
 });
 
 
+//get count 
+app.get("/admin/getcount", async (req, res) => {
+    try {
+        const totalUsers = await users.countDocuments();
+        const totalPolicies = await policies.countDocuments();
+        const totalClaims = await claims.countDocuments();
+
+        // Sending the counts as JSON response
+        res.json({
+            totalUsers,
+            totalPolicies,
+            totalClaims
+        });
+    } catch(error) {
+        // Sending an error response if there's an error
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 //get particular user details
 app.get("/user/:emailId", function(req, res) {
 
@@ -66,6 +85,8 @@ app.get("/user/:emailId", function(req, res) {
         })
 
 });
+
+//get policies using email id
 
 //get particular user details
 app.get("/user/policies/:userId", function(req, res) {
@@ -431,6 +452,7 @@ app.post("/userlogin", function(req, res){
         return res.status(200).send({
             status: 200,
             message: "Login Successful...!",
+            userId: user.userId,
             token
         }); 
 
@@ -539,9 +561,8 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
 
 //post request made when the user click on claim request button
 app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
-    const {insuranceId, claimedAmount, reason, userId} = req.body;
-
-    if(!insuranceId || !claimedAmount || !reason || !userId){
+    const {insuranceId, claimedAmount, reason} = req.body;
+    if(!insuranceId || !claimedAmount || !reason){
         return res.status(400).json({
             statusCode: 400,
             message : "All fields are mandatory" 
@@ -553,7 +574,7 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
 
         if(req.body.claimedAmount <= policyData.residualAmount){
             const claimData = new claims({
-                userId: userId,
+                userId: policyData.userId,
                 claimId: req.uniqueId,
                 insuranceId: insuranceId,
                 claimedAmount: claimedAmount,

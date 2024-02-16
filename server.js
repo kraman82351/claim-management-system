@@ -67,6 +67,36 @@ app.get("/user/:emailId", function(req, res) {
 
 });
 
+//get particular user details
+app.get("/user/policies/:userId", function(req, res) {
+
+    const {userId} = req.params;
+
+    policies.find({userId})
+        .then(policy =>{
+            res.json(policy);
+        })
+        .catch(error => {
+            res.status(400).json({ error: "No policies Found" });
+        })
+
+});
+
+//get particular user details
+app.get("/user/claims/:userId", function(req, res) {
+
+    const {userId} = req.params;
+
+    claims.find({userId})
+        .then(claim =>{
+            res.json(claim);
+        })
+        .catch(error => {
+            res.status(400).json({ error: "No Claims found" });
+        })
+
+});
+
 //get all the users details
 app.get("/admin/get_users", function(req, res) {
 
@@ -306,7 +336,6 @@ function isNameValid(name) {
 //register user 
 app.post("/register", generateUniqueId, (req, res) =>{
     const { fullName, address, emailId, password} = req.body;
-    console.log(fullName);
 
     if( !fullName || !address || !emailId || !password){
         return res.status(400).json({
@@ -460,8 +489,8 @@ app.get("/home/add_insurance", function(req, res){
 
 //add the selected insurance 
 app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
-    const policyNumber = req.body.policyNumber;
-    const userId = req.body.userId;    
+     
+    const {policyNumber, userId} = req.body;
 
     if(!policyNumber || !userId){
         return res.status(400).json({
@@ -494,7 +523,10 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
         });
 
         insurancePolicy.save()
-            .then(result => res.status(201).json("Policy added successfully"))
+            .then(result => res.status(201).json({
+                status: 200,
+                response : insurancePolicy,
+                message:"Insurance added"}))
             .catch(error => res.status(500).json({
                 statusCode: 500,
                 message: "Policy addition failed."
@@ -507,10 +539,9 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
 
 //post request made when the user click on claim request button
 app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
+    const {insuranceId, claimedAmount, reason, userId} = req.body;
 
-    const {insuranceId, claimedAmount, reason} = req.body;
-
-    if(!insuranceId || !claimedAmount || !reason){
+    if(!insuranceId || !claimedAmount || !reason || !userId){
         return res.status(400).json({
             statusCode: 400,
             message : "All fields are mandatory" 
@@ -521,8 +552,8 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
     .then(policyData => {
 
         if(req.body.claimedAmount <= policyData.residualAmount){
-
             const claimData = new claims({
+                userId: userId,
                 claimId: req.uniqueId,
                 insuranceId: insuranceId,
                 claimedAmount: claimedAmount,
@@ -532,9 +563,12 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
             });
             
             claimData.save()
-                .then(result => res.status(201).json("Claim request sent successfully"))
+                .then(result => res.status(201).json({
+                    status: 200,
+                    response : claimData,
+                    message:"Claim sent Successfully"}))
                 .catch(error => res.status(500).json({
-                    statusCode: 500,
+                    status: 500,
                     error: "Claim request failed due to server error."
                 }));
 

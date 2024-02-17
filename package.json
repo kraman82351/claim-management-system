@@ -16,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/kraman82351/claim-management-system/issues"
   },
-  "homepage": "https://github.com/kraman82351/claim-management-system#readme"
+  "homepage": "https://github.com/kraman82351/claim-management-system#readme",
+  "dependencies": {
+    "nodemon": "^3.0.3"
+  }
 }

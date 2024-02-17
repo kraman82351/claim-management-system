@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken')
 const data = require('./database/SampleData.js')
 const bodyParser = require("body-parser");
 const connect = require('./database/conn.js');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const { v4: uuidv4 } = require('uuid'); // for unique ID generation
 

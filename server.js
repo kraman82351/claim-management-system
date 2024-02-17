@@ -32,25 +32,6 @@ function generateUniqueId(req, res, next) {
     next(); 
 }
 
-//testing
-app.get("/testing", function(req, res){
-    res.send("hcabk");
-  });
-//root route the login page
-app.get("/", function(req, res){
-  res.sendFile(__dirname + '/index.html');
-});
-
-//Customer home page
-app.get("/home", function(req, res){
-    res.sendFile(__dirname + '/home.html');
-});
-
-//Admin home page
-app.get("/admin", function(req, res){
-    res.sendFile(__dirname + '/admin_home.html');
-});
-
 
 //get count 
 app.get("/admin/getcount", async (req, res) => {
@@ -584,7 +565,7 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
             });
             
             claimData.save()
-                .then(result => res.status(201).json({
+                .then(result => res.status(200).json({
                     status: 200,
                     response : claimData,
                     message:"Claim sent Successfully"}))

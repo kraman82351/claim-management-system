@@ -8,6 +8,8 @@ const data = require('./database/SampleData.js')
 const bodyParser = require("body-parser");
 const connect = require('./database/conn.js');
 const bcrypt = require('bcryptjs');
+const swaggerjsdoc = require("swagger-jsdoc")
+const swaggerui = require("swagger-ui-express")
 
 const { v4: uuidv4 } = require('uuid'); // for unique ID generation
 
@@ -83,7 +85,6 @@ app.get("/user/policies/:userId", function(req, res) {
         })
 
 });
-
 //get particular user details
 app.get("/user/claims/:userId", function(req, res) {
 
@@ -356,13 +357,13 @@ app.post("/register", generateUniqueId, (req, res) =>{
     //email validation
     const emailError = emailValidate({}, emailId);
     if(emailError.message != "ok"){
-        return res.status(400).send({status: 409, Error: emailError.message});
+        return res.status(400).send({status: 409, message: emailError.message});
     }
 
     //password validation
     const passwordError = passwordValidate({}, password);
     if(passwordError.message != "ok"){
-        return res.status(400).send({status: 409, Error: passwordError.message});
+        return res.status(400).send({status: 409, message: passwordError.message});
     }
     users.findOne({emailId })
         .then( user =>{
@@ -418,31 +419,32 @@ app.post("/userlogin", function(req, res){
     users.findOne({emailId})
         .then(user => {
             if(!user){
-                return res.status(404).json({ 
-                    status: 404,
-                    error: "Couldn't Find the user" });
+                return res.status(409).json({
+                    status: 409,
+                    message : "Email Id not registered" 
+                })
             }
             bcrypt.compare(password, user.password)
                 .then(passwordCheck =>{
-                    if(!passwordCheck) return res.status(400).send({ error: "Don't have Password"});
+                    if(!passwordCheck) return res.status(400).send({ message: "Don't have Password"});
 
                     const token = jwt.sign({
                         userId: user._id,
                     }, process.env.JWT_SECRET , { expiresIn : "24h"});
 
-        return res.status(200).send({
-            status: 200,
-            message: "Login Successful...!",
-            userId: user.userId,
-            token
-        }); 
+                    return res.status(200).send({
+                        status: 200,
+                        message: "Login Successful...!",
+                        userId: user.userId,
+                        token
+                    }); 
 
                 })
                 .catch(error =>{
-                    return res.status(400).send({ error: "Password does not Match"})
+                    return res.status(400).send({ message: "Password does not Match"})
                 })
         })
-        .catch(error => res.status(500).json("Server Error"));
+        .catch(error => res.status(500).json({message:"Server Error"}));
 })
 
 //admin login
@@ -589,7 +591,28 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
 
 });
 
+const options = {
+    definition: {
+        openapi: "3.0.0",
+        info : {
+            title: "Claim management System api docs",
+            version: "0.1"
+        },
+        servers: [
+            {
+                url: "http://localhost:3000"
+            },
+        ],
+    },
+    apis: ["server.js"]
+};
 
+const spacs = swaggerjsdoc(options)
+app.use(
+    "/api-docs",
+    swaggerui.serve,
+    swaggerui.setup(spacs)
+)
 
 const port = 3000;
 connect().then(() => {

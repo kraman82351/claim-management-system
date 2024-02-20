@@ -10,7 +10,6 @@ const connect = require('./database/conn.js');
 const bcrypt = require('bcryptjs');
 const swaggerjsdoc = require("swagger-jsdoc")
 const swaggerui = require("swagger-ui-express")
-
 const { v4: uuidv4 } = require('uuid'); // for unique ID generation
 
 const app = express();
@@ -26,6 +25,10 @@ const policies = require('./model/policyModel.js');
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
 
+const swaggerDefinition = require('./swagger');
+
+// Combine all Swagger routes into a single object
+app.use('/api-docs', swaggerui.serve, swaggerui.setup(swaggerDefinition));
 
 
 //generate unique id
@@ -33,6 +36,186 @@ function generateUniqueId(req, res, next) {
     req.uniqueId = uuidv4(); // Generating a unique ID using uuidv4 and attaching it to the request object
     next(); 
 }
+
+
+
+//password verification
+function passwordValidate(errors = {}, password){
+    /* eslint-disable no-useless-escape */
+    const specialChars = /[`!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/;
+    errors = { message: "ok"};
+
+    if(!password){
+        errors.message = "Password Required...!";
+    } else if(password.includes(" ")){
+        errors.message = "Password must not contain spaces";
+    }else if(password.length < 4){
+        errors.message = "Password must be more than 4 characters long";
+    }else if(!specialChars.test(password)){
+        errors.message = "Password must have special character";
+    }
+    return errors;
+}
+
+//email validation
+function emailValidate(error ={}, email){
+    error.message = "ok";
+
+    if(!email){
+        error.message = "Email Required...!";
+    }else if(email.includes(" ")){
+        error.message = "Email should not include spaces";
+    }else if(!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(email)){
+        error.message = "Invalid email address...!";
+    }
+
+    return error;
+}
+
+//name validation
+function isNameValid(name) {
+    const digitRegex = /\d/;
+    return !digitRegex.test(name);
+}
+
+
+//register user 
+app.post("/register", generateUniqueId, (req, res) =>{
+    const { fullName, address, emailId, password} = req.body;
+
+    if( !fullName || !address || !emailId || !password){
+        return res.status(400).json({
+            status: 400,
+            message : "All fields are mandatory" 
+        });
+    }
+
+    if(!isNameValid(fullName)){
+        return res.status(400).json({
+            status: 400,
+            message : "Name should not contain numbers" 
+        });
+    }
+
+    //email validation
+    const emailError = emailValidate({}, emailId);
+    if(emailError.message != "ok"){
+        return res.status(400).send({status: 409, message: emailError.message});
+    }
+
+    //password validation
+    const passwordError = passwordValidate({}, password);
+    if(passwordError.message != "ok"){
+        return res.status(400).send({status: 409, message: passwordError.message});
+    }
+    users.findOne({emailId })
+        .then( user =>{
+            if(user){
+                return res.status(409).json({
+                    status: 409,
+                    message : "Email already in use" 
+                })
+            }
+            bcrypt.hash(password, 10)
+                .then(hassedPassword => {
+                    userData = new users({
+                        userId: req.uniqueId,
+                        fullName: fullName,
+                        address: address,
+                        emailId: emailId,
+                        password: hassedPassword,
+                        policies: [],
+                        claims: []
+                    });
+                    
+                    userData.save()
+                        .then(result => res.status(201).json({
+                            status: 200,
+                            response : userData,
+                            message:"User Register Successfully"}))
+                        .catch(error => res.status(500).json({
+                            status: 500,
+                            message: "Registration failed. Try again later"
+                        }))
+                })
+                .catch(error => {
+                    return res.status(500).send({
+                        error : "Enable to hashed password"
+                    })
+                })
+
+        });
+  
+});
+
+//user login
+app.post("/userlogin", function(req, res){
+    const {emailId, password} = req.body;
+
+    if(!emailId || !password){
+        return res.status(400).json({
+            status: 400,
+            message : "All fields are mandatory" 
+        });
+    }
+
+    users.findOne({emailId})
+        .then(user => {
+            if(!user){
+                return res.status(409).json({
+                    status: 409,
+                    message : "Email Id not registered" 
+                })
+            }
+            bcrypt.compare(password, user.password)
+                .then(passwordCheck =>{
+                    if(!passwordCheck) return res.status(400).send({ message: "Don't have Password"});
+
+                    const token = jwt.sign({
+                        userId: user._id,
+                    }, process.env.JWT_SECRET , { expiresIn : "24h"});
+
+                    return res.status(200).send({
+                        status: 200,
+                        message: "Login Successful...!",
+                        userId: user.userId,
+                        token
+                    }); 
+
+                })
+                .catch(error =>{
+                    return res.status(400).send({ message: "Password does not Match"})
+                })
+        })
+        .catch(error => res.status(500).json({message:"Server Error"}));
+})
+
+//admin login
+app.post("/adminlogin", function(req, res){
+    const { emailId, password } = req.body;
+
+    if (!emailId || !password) {
+        return res.status(400).json({
+            status: 400,
+            message: "All fields are mandatory" 
+        });
+    }
+
+    const adminData = data.adminData.find(admin => admin.emailId === emailId && admin.password === password);
+
+    if (adminData) {
+        // If credentials match, send a JSON response with a success message
+        res.json({ status: 200, message: "Admin logged In" });
+    } else {
+        // If credentials don't match, send a JSON response with an error message
+        res.status(400).json({
+            status: 400,
+            message: "Wrong credentials" 
+        });
+    }
+    
+})
+
 
 
 //get count 
@@ -52,52 +235,6 @@ app.get("/admin/getcount", async (req, res) => {
         // Sending an error response if there's an error
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
-
-//get particular user details
-app.get("/user/:emailId", function(req, res) {
-
-    const {emailId} = req.params;
-
-    users.findOne({emailId})
-        .then(user =>{
-            res.json(user);
-        })
-        .catch(error => {
-            res.status(400).json({ error: "Insurance not found" });
-        })
-
-});
-
-//get policies using email id
-
-//get particular user details
-app.get("/user/policies/:userId", function(req, res) {
-
-    const {userId} = req.params;
-
-    policies.find({userId})
-        .then(policy =>{
-            res.json(policy);
-        })
-        .catch(error => {
-            res.status(400).json({ error: "No policies Found" });
-        })
-
-});
-//get particular user details
-app.get("/user/claims/:userId", function(req, res) {
-
-    const {userId} = req.params;
-
-    claims.find({userId})
-        .then(claim =>{
-            res.json(claim);
-        })
-        .catch(error => {
-            res.status(400).json({ error: "No Claims found" });
-        })
-
 });
 
 //get all the users details
@@ -297,181 +434,52 @@ app.delete("/admin/delete_user", function(req, res){
 
 });
 
-//password verification
-function passwordValidate(errors = {}, password){
-    /* eslint-disable no-useless-escape */
-    const specialChars = /[`!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/;
-    errors = { message: "ok"};
 
-    if(!password){
-        errors.message = "Password Required...!";
-    } else if(password.includes(" ")){
-        errors.message = "Password must not contain spaces";
-    }else if(password.length < 4){
-        errors.message = "Password must be more than 4 characters long";
-    }else if(!specialChars.test(password)){
-        errors.message = "Password must have special character";
-    }
-    return errors;
-}
+//get particular user details
+app.get("/user/:emailId", function(req, res) {
 
-//email validation
-function emailValidate(error ={}, email){
-    error.message = "ok";
-
-    if(!email){
-        error.message = "Email Required...!";
-    }else if(email.includes(" ")){
-        error.message = "Email should not include spaces";
-    }else if(!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(email)){
-        error.message = "Invalid email address...!";
-    }
-
-    return error;
-}
-
-//name validation
-function isNameValid(name) {
-    const digitRegex = /\d/;
-    return !digitRegex.test(name);
-}
-
-//register user 
-app.post("/register", generateUniqueId, (req, res) =>{
-    const { fullName, address, emailId, password} = req.body;
-
-    if( !fullName || !address || !emailId || !password){
-        return res.status(400).json({
-            status: 400,
-            message : "All fields are mandatory" 
-        });
-    }
-
-    if(!isNameValid(fullName)){
-        return res.status(400).json({
-            status: 400,
-            message : "Name should not contain numbers" 
-        });
-    }
-
-    //email validation
-    const emailError = emailValidate({}, emailId);
-    if(emailError.message != "ok"){
-        return res.status(400).send({status: 409, message: emailError.message});
-    }
-
-    //password validation
-    const passwordError = passwordValidate({}, password);
-    if(passwordError.message != "ok"){
-        return res.status(400).send({status: 409, message: passwordError.message});
-    }
-    users.findOne({emailId })
-        .then( user =>{
-            if(user){
-                return res.status(409).json({
-                    status: 409,
-                    message : "Email already in use" 
-                })
-            }
-            bcrypt.hash(password, 10)
-                .then(hassedPassword => {
-                    userData = new users({
-                        userId: req.uniqueId,
-                        fullName: fullName,
-                        address: address,
-                        emailId: emailId,
-                        password: hassedPassword,
-                        policies: [],
-                        claims: []
-                    });
-                    
-                    userData.save()
-                        .then(result => res.status(201).json({
-                            status: 200,
-                            response : userData,
-                            message:"User Register Successfully"}))
-                        .catch(error => res.status(500).json({
-                            status: 500,
-                            message: "Registration failed. Try again later"
-                        }))
-                })
-                .catch(error => {
-                    return res.status(500).send({
-                        error : "Enable to hashed password"
-                    })
-                })
-
-        });
-  
-});
-
-//user login
-app.post("/userlogin", function(req, res){
-    const {emailId, password} = req.body;
-
-    if(!emailId || !password){
-        return res.status(400).json({
-            status: 400,
-            message : "All fields are mandatory" 
-        });
-    }
+    const {emailId} = req.params;
 
     users.findOne({emailId})
-        .then(user => {
-            if(!user){
-                return res.status(409).json({
-                    status: 409,
-                    message : "Email Id not registered" 
-                })
-            }
-            bcrypt.compare(password, user.password)
-                .then(passwordCheck =>{
-                    if(!passwordCheck) return res.status(400).send({ message: "Don't have Password"});
-
-                    const token = jwt.sign({
-                        userId: user._id,
-                    }, process.env.JWT_SECRET , { expiresIn : "24h"});
-
-                    return res.status(200).send({
-                        status: 200,
-                        message: "Login Successful...!",
-                        userId: user.userId,
-                        token
-                    }); 
-
-                })
-                .catch(error =>{
-                    return res.status(400).send({ message: "Password does not Match"})
-                })
+        .then(user =>{
+            res.json(user);
         })
-        .catch(error => res.status(500).json({message:"Server Error"}));
-})
+        .catch(error => {
+            res.status(400).json({ error: "Insurance not found" });
+        })
 
-//admin login
-app.post("/adminlogin", function(req, res){
-    const { emailId, password } = req.body;
+});
 
-    if (!emailId || !password) {
-        return res.status(400).json({
-            status: 400,
-            message: "All fields are mandatory" 
-        });
-    }
 
-    const adminData = data.adminData.find(admin => admin.emailId === emailId && admin.password === password);
+//get particular user details
+app.get("/user/policies/:userId", function(req, res) {
 
-    if (adminData) {
-        // If credentials match, send a JSON response with a success message
-        res.json({ status: 200, message: "Admin logged In" });
-    } else {
-        // If credentials don't match, send a JSON response with an error message
-        res.status(400).json({
-            status: 400,
-            message: "Wrong credentials" 
-        });
-    }
-    
-})
+    const {userId} = req.params;
+
+    policies.find({userId})
+        .then(policy =>{
+            res.json(policy);
+        })
+        .catch(error => {
+            res.status(400).json({ error: "No policies Found" });
+        })
+
+});
+
+//get particular user details
+app.get("/user/claims/:userId", function(req, res) {
+
+    const {userId} = req.params;
+
+    claims.find({userId})
+        .then(claim =>{
+            res.json(claim);
+        })
+        .catch(error => {
+            res.status(400).json({ error: "No Claims found" });
+        })
+
+});
 
 
 //show all the available insurance policies
@@ -591,28 +599,28 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
 
 });
 
-const options = {
-    definition: {
-        openapi: "3.0.0",
-        info : {
-            title: "Claim management System api docs",
-            version: "0.1"
-        },
-        servers: [
-            {
-                url: "http://localhost:3000"
-            },
-        ],
-    },
-    apis: ["server.js"]
-};
+// const options = {
+//     definition: {
+//         openapi: "3.0.0",
+//         info : {
+//             title: "Claim management System api docs",
+//             version: "0.1"
+//         },
+//         servers: [
+//             {
+//                 url: "http://localhost:3000"
+//             },
+//         ],
+//     },
+//     apis: ["server.js"]
+// };
 
-const spacs = swaggerjsdoc(options)
-app.use(
-    "/api-docs",
-    swaggerui.serve,
-    swaggerui.setup(spacs)
-)
+// const spacs = swaggerjsdoc(options)
+// app.use(
+//     "/api-docs",
+//     swaggerui.serve,
+//     swaggerui.setup(spacs)
+// )
 
 const port = 3000;
 connect().then(() => {

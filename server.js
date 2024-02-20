@@ -2,15 +2,19 @@
 require("dotenv").config();
 const mongoose = require('mongoose');
 const express = require("express");
+const cors = require("cors")
+const jwt = require('jsonwebtoken')
 const data = require('./database/SampleData.js')
 const bodyParser = require("body-parser");
 const connect = require('./database/conn.js');
+const bcrypt = require('bcryptjs');
 
 const { v4: uuidv4 } = require('uuid'); // for unique ID generation
 
 const app = express();
 connect();
 app.use(express.json());
+app.use(cors());
 
 const users = require('./model/userModel.js');
 const availablePolicies = require('./model/availablePolicy.js');
@@ -28,19 +32,71 @@ function generateUniqueId(req, res, next) {
     next(); 
 }
 
-//root route the login page
-app.get("/", function(req, res){
-  res.sendFile(__dirname + '/index.html');
+
+//get count 
+app.get("/admin/getcount", async (req, res) => {
+    try {
+        const totalUsers = await users.countDocuments();
+        const totalPolicies = await policies.countDocuments();
+        const totalClaims = await claims.countDocuments();
+
+        // Sending the counts as JSON response
+        res.json({
+            totalUsers,
+            totalPolicies,
+            totalClaims
+        });
+    } catch(error) {
+        // Sending an error response if there's an error
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
 });
 
-//Customer home page
-app.get("/home", function(req, res){
-    res.sendFile(__dirname + '/home.html');
+//get particular user details
+app.get("/user/:emailId", function(req, res) {
+
+    const {emailId} = req.params;
+
+    users.findOne({emailId})
+        .then(user =>{
+            res.json(user);
+        })
+        .catch(error => {
+            res.status(400).json({ error: "Insurance not found" });
+        })
+
 });
 
-//Admin home page
-app.get("/admin", function(req, res){
-    res.sendFile(__dirname + '/admin_home.html');
+//get policies using email id
+
+//get particular user details
+app.get("/user/policies/:userId", function(req, res) {
+
+    const {userId} = req.params;
+
+    policies.find({userId})
+        .then(policy =>{
+            res.json(policy);
+        })
+        .catch(error => {
+            res.status(400).json({ error: "No policies Found" });
+        })
+
+});
+
+//get particular user details
+app.get("/user/claims/:userId", function(req, res) {
+
+    const {userId} = req.params;
+
+    claims.find({userId})
+        .then(claim =>{
+            res.json(claim);
+        })
+        .catch(error => {
+            res.status(400).json({ error: "No Claims found" });
+        })
+
 });
 
 //get all the users details
@@ -273,56 +329,147 @@ function emailValidate(error ={}, email){
     return error;
 }
 
+//name validation
+function isNameValid(name) {
+    const digitRegex = /\d/;
+    return !digitRegex.test(name);
+}
+
 //register user 
 app.post("/register", generateUniqueId, (req, res) =>{
     const { fullName, address, emailId, password} = req.body;
 
     if( !fullName || !address || !emailId || !password){
         return res.status(400).json({
-            statusCode: 400,
+            status: 400,
             message : "All fields are mandatory" 
+        });
+    }
+
+    if(!isNameValid(fullName)){
+        return res.status(400).json({
+            status: 400,
+            message : "Name should not contain numbers" 
         });
     }
 
     //email validation
     const emailError = emailValidate({}, emailId);
     if(emailError.message != "ok"){
-        return res.status(400).send({Error: emailError.message});
+        return res.status(400).send({status: 409, Error: emailError.message});
     }
 
     //password validation
     const passwordError = passwordValidate({}, password);
     if(passwordError.message != "ok"){
-        return res.status(400).send({Error: passwordError.message});
+        return res.status(400).send({status: 409, Error: passwordError.message});
     }
     users.findOne({emailId })
         .then( user =>{
             if(user){
                 return res.status(409).json({
-                    statusCode: 409,
+                    status: 409,
                     message : "Email already in use" 
                 })
             }
-            userData = new users({
-                userId: req.uniqueId,
-                fullName: fullName,
-                address: address,
-                emailId: emailId,
-                password: password,
-                policies: [],
-                claims: []
-                });
-            
-                userData.save()
-                    .then(result => res.status(201).json("User Register Successfully"))
-                    .catch(error => res.status(500).json({
-                        statusCode: 500,
-                        message: "Registration failed. Try again later"
-                    }))
+            bcrypt.hash(password, 10)
+                .then(hassedPassword => {
+                    userData = new users({
+                        userId: req.uniqueId,
+                        fullName: fullName,
+                        address: address,
+                        emailId: emailId,
+                        password: hassedPassword,
+                        policies: [],
+                        claims: []
+                    });
+                    
+                    userData.save()
+                        .then(result => res.status(201).json({
+                            status: 200,
+                            response : userData,
+                            message:"User Register Successfully"}))
+                        .catch(error => res.status(500).json({
+                            status: 500,
+                            message: "Registration failed. Try again later"
+                        }))
+                })
+                .catch(error => {
+                    return res.status(500).send({
+                        error : "Enable to hashed password"
+                    })
+                })
 
         });
   
 });
+
+//user login
+app.post("/userlogin", function(req, res){
+    const {emailId, password} = req.body;
+
+    if(!emailId || !password){
+        return res.status(400).json({
+            status: 400,
+            message : "All fields are mandatory" 
+        });
+    }
+
+    users.findOne({emailId})
+        .then(user => {
+            if(!user){
+                return res.status(404).json({ 
+                    status: 404,
+                    error: "Couldn't Find the user" });
+            }
+            bcrypt.compare(password, user.password)
+                .then(passwordCheck =>{
+                    if(!passwordCheck) return res.status(400).send({ error: "Don't have Password"});
+
+                    const token = jwt.sign({
+                        userId: user._id,
+                    }, process.env.JWT_SECRET , { expiresIn : "24h"});
+
+        return res.status(200).send({
+            status: 200,
+            message: "Login Successful...!",
+            userId: user.userId,
+            token
+        }); 
+
+                })
+                .catch(error =>{
+                    return res.status(400).send({ error: "Password does not Match"})
+                })
+        })
+        .catch(error => res.status(500).json("Server Error"));
+})
+
+//admin login
+app.post("/adminlogin", function(req, res){
+    const { emailId, password } = req.body;
+
+    if (!emailId || !password) {
+        return res.status(400).json({
+            status: 400,
+            message: "All fields are mandatory" 
+        });
+    }
+
+    const adminData = data.adminData.find(admin => admin.emailId === emailId && admin.password === password);
+
+    if (adminData) {
+        // If credentials match, send a JSON response with a success message
+        res.json({ status: 200, message: "Admin logged In" });
+    } else {
+        // If credentials don't match, send a JSON response with an error message
+        res.status(400).json({
+            status: 400,
+            message: "Wrong credentials" 
+        });
+    }
+    
+})
 
 
 //show all the available insurance policies
@@ -345,8 +492,8 @@ app.get("/home/add_insurance", function(req, res){
 
 //add the selected insurance 
 app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
-    const policyNumber = req.body.policyNumber;
-    const userId = req.body.userId;    
+     
+    const {policyNumber, userId} = req.body;
 
     if(!policyNumber || !userId){
         return res.status(400).json({
@@ -379,7 +526,10 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
         });
 
         insurancePolicy.save()
-            .then(result => res.status(201).json("Policy added successfully"))
+            .then(result => res.status(201).json({
+                status: 200,
+                response : insurancePolicy,
+                message:"Insurance added"}))
             .catch(error => res.status(500).json({
                 statusCode: 500,
                 message: "Policy addition failed."
@@ -392,9 +542,7 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
 
 //post request made when the user click on claim request button
 app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
-
     const {insuranceId, claimedAmount, reason} = req.body;
-
     if(!insuranceId || !claimedAmount || !reason){
         return res.status(400).json({
             statusCode: 400,
@@ -406,8 +554,8 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
     .then(policyData => {
 
         if(req.body.claimedAmount <= policyData.residualAmount){
-
             const claimData = new claims({
+                userId: policyData.userId,
                 claimId: req.uniqueId,
                 insuranceId: insuranceId,
                 claimedAmount: claimedAmount,
@@ -417,9 +565,12 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
             });
             
             claimData.save()
-                .then(result => res.status(201).json("Claim request sent successfully"))
+                .then(result => res.status(200).json({
+                    status: 200,
+                    response : claimData,
+                    message:"Claim sent Successfully"}))
                 .catch(error => res.status(500).json({
-                    statusCode: 500,
+                    status: 500,
                     error: "Claim request failed due to server error."
                 }));
 
@@ -439,6 +590,7 @@ app.post("/home/claim_insurance", generateUniqueId, (req, res) => {
 });
 
 
+
 const port = 3000;
 connect().then(() => {
     try {
@@ -452,3 +604,4 @@ connect().then(() => {
     console.log("Invalid Database Connection");
 })
  
+

@@ -8,7 +8,6 @@ const data = require('./database/SampleData.js')
 const bodyParser = require("body-parser");
 const connect = require('./database/conn.js');
 const bcrypt = require('bcryptjs');
-const swaggerjsdoc = require("swagger-jsdoc")
 const swaggerui = require("swagger-ui-express")
 const { v4: uuidv4 } = require('uuid'); // for unique ID generation
 
@@ -520,9 +519,10 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
                 error: "Couldn't Find the Policy" });
         }
 
-        const start = new Date().toISOString().slice(0, 10);
+        const start = new Date().toISOString().slice(0, 10); // Get current date in YYYY-MM-DD format
+        start.getDate();
         const end = new Date();
-        end.setFullYear(end.getFullYear() + 1);
+        //end.setFullYear(end.getFullYear() + 1); // Set end date to one year from now
 
         const insurancePolicy = new policies({
             insuranceId: req.uniqueId,
@@ -532,7 +532,7 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
             residualAmount: policy.coverageAmount,
             premium: policy.premium,
             startDate: start,
-            endDate: end.toISOString().slice(0, 10)
+            endDate: end.toISOString().slice(0, 10) // Convert end date to YYYY-MM-DD format
         });
 
         insurancePolicy.save()

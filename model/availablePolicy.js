@@ -9,7 +9,7 @@ const availablePoliciesSchema = new mongoose.Schema({
     policyType: {type: String, required: true},
     coverageAmount: {type: Number, required: true},
     premium: {type: Number, required: true}
-})
+},{timestamps: true})
 
 
 module.exports = mongoose.model('availablePolicy',availablePoliciesSchema); 

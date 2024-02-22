@@ -43,6 +43,7 @@ const registerRoute = {
   
 
   const userLoginRoute = {
+
     "/userlogin": {
       post: {
         summary: "User Login",
@@ -516,7 +517,6 @@ const registerRoute = {
       info: {
         title: "Claim management System API Docs",
         version: "0.1",
-        description: "Description of your API",
       },
       servers: [
         {

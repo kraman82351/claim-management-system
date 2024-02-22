@@ -13,7 +13,7 @@ const policySchema = new mongoose.Schema({
     startDate: {type: Date},
     endDate: {type: Date}
 
-})
+},{timestamps: true})
 
 
 module.exports = mongoose.model.allpolicies || mongoose.model('policy', policySchema);

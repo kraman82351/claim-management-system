@@ -510,7 +510,6 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
             message : "All fields are mandatory" 
         });
     }
-
     availablePolicies.findOne({ policyNumber })
     .then(policy => {
         if (!policy) {
@@ -520,9 +519,8 @@ app.post("/home/add_insurance", generateUniqueId ,(req, res) => {
         }
 
         const start = new Date().toISOString().slice(0, 10); // Get current date in YYYY-MM-DD format
-        start.getDate();
         const end = new Date();
-        //end.setFullYear(end.getFullYear() + 1); // Set end date to one year from now
+        end.setFullYear(end.getFullYear() + 1); // Set end date to one year from now
 
         const insurancePolicy = new policies({
             insuranceId: req.uniqueId,

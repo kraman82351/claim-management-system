@@ -32,7 +32,7 @@ const UserSchema = new mongoose.Schema({
     policies: { type: Array , default: []},
     claims: {type: Array , default: []}
 
-});
+},{timestamps: true})
 
 module.exports = mongoose.model.allUsers || mongoose.model('User', UserSchema);
 

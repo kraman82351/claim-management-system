@@ -10,7 +10,7 @@ const claimSchema = new mongoose.Schema({
     requestDate: {type : Date},
     status: {type: String}
 
-})
+},{timestamps: true})
 
 module.exports = mongoose.model('claim', claimSchema);
 

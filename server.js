@@ -2,6 +2,7 @@
 require("dotenv").config();
 const mongoose = require('mongoose');
 const express = require("express");
+const client = require('prom-client')
 const cors = require("cors")
 const jwt = require('jsonwebtoken')
 const data = require('./database/SampleData.js')
@@ -20,6 +21,10 @@ const users = require('./model/userModel.js');
 const availablePolicies = require('./model/availablePolicy.js');
 const claims = require('./model/claimModel.js');
 const policies = require('./model/policyModel.js');
+
+const collectDefaultMetrics = client.collectDefaultMetrics
+
+collectDefaultMetrics({register : client.register});
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
@@ -77,6 +82,12 @@ function isNameValid(name) {
     return !digitRegex.test(name);
 }
 
+//prometheius
+app.get("/metrics", async (req, res) =>{
+    res.setHeader("Comntent-Type", client.register.contentType);
+    const metrics = await client.register.metrics();
+    res.send(metrics);
+})
 
 //register user 
 app.post("/register", generateUniqueId, (req, res) =>{
